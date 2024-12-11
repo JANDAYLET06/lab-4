@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>КиноСайт</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f9f9f9;
+            color: #333;
+        }
+        h1, h2 {
+            text-align: center;
+        }
+        input, select, button {
+            margin: 10px 5px;
+            padding: 10px;
+            font-size: 16px;
+        }
+        input, select {
+            width: 300px;
+            max-width: 100%;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #4CAF50;
+            color: white;
+            cursor: pointer;
+        }
+        th:hover {
+            background-color: #45a049;
+        }
+        tbody tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+        tbody tr:hover {
+            background-color: #ddd;
+        }
+        .filters, .controls {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>КиноСайт</h1>
+    <h2>Фильмы</h2>
+
+    <div class="filters">
+        <input type="text" id="filter-title" placeholder="Поиск по названию" onkeyup="applyFilters()" />
+        <select id="filter-genre" onchange="applyFilters()">
+            <option value="">Все жанры</option>
+        </select>
+    </div>
+
+    <div class="controls">
+        <input type="text" id="new-title" placeholder="Название" />
+        <input type="text" id="new-genre" placeholder="Жанр" />
+        <input type="number" step="0.1" id="new-rating" placeholder="Рейтинг" />
+        <button onclick="addMovie()">Добавить</button>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th onclick="sortTable(0)">Название</th>
+                <th onclick="sortTable(1)">Жанр</th>
+                <th onclick="sortTable(2)">Рейтинг</th>
+                <th>Действия</th>
+            </tr>
+        </thead>
+        <tbody id="movie-table"></tbody>
+    </table>
+
+    <script>
+        let moviesData = []; // Хранение данных для фильтров
+
+        // Загрузка и отображение XML
+        fetch('movies.xml')
+            .then(response => response.text())
+            .then(data => {
+                const parser = new DOMParser();
+                const xmlDoc = parser.parseFromString(data, 'text/xml');
+                const movies = xmlDoc.getElementsByTagName('movie');
+
+                const table = document.getElementById('movie-table');
+                const genreFilter = document.getElementById('filter-genre');
+
+                const genres = new Set();
+
+                for (let movie of movies) {
+                    const title = movie.getElementsByTagName('title')[0].textContent;
+                    const genre = movie.getElementsByTagName('genre')[0].textContent;
+                    const rating = movie.getElementsByTagName('rating')[0].textContent;
+
+                    // Сохраняем данные
+                    moviesData.push({ title, genre, rating });
+
+                    // Сохраняем уникальные значения для фильтров
+                    genres.add(genre);
+
+                    // Создаем строку таблицы
+                    addRowToTable({ title, genre, rating });
+                }
+
+                // Заполняем фильтры
+                genres.forEach(g => genreFilter.add(new Option(g, g)));
+            });
+
+        // Применение фильтров
+        function applyFilters() {
+            const filterTitle = document.getElementById('filter-title').value.toLowerCase();
+            const filterGenre = document.getElementById('filter-genre').value;
+
+            const table = document.getElementById('movie-table');
+            table.innerHTML = ''; // Очищаем таблицу
+
+            moviesData.forEach(movie => {
+                if (
+                    (movie.title.toLowerCase().includes(filterTitle) || !filterTitle) &&
+                    (movie.genre === filterGenre || !filterGenre)
+                ) {
+                    addRowToTable(movie);
+                }
+            });
+        }
+
+        // Добавление фильма
+        function addMovie() {
+            const title = document.getElementById('new-title').value;
+            const genre = document.getElementById('new-genre').value;
+            const rating = document.getElementById('new-rating').value;
+
+            if (!title || !genre || !rating) {
+                alert('Заполните все поля для добавления фильма.');
+                return;
+            }
+
+            const newMovie = { title, genre, rating };
+            moviesData.push(newMovie);
+            addRowToTable(newMovie);
+
+            // Обновляем фильтры
+            document.getElementById('filter-genre').add(new Option(genre, genre));
+        }
+
+        // Добавление строки в таблицу
+        function addRowToTable(movie) {
+            const table = document.getElementById('movie-table');
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${movie.title}</td>
+                <td>${movie.genre}</td>
+                <td>${movie.rating}</td>
+                <td><button onclick="deleteMovie('${movie.title}')">Удалить</button></td>
+            `;
+            table.appendChild(row);
+        }
+
+        // Удаление фильма
+        function deleteMovie(title) {
+            moviesData = moviesData.filter(movie => movie.title !== title);
+            applyFilters();
+        }
+
+        // Сортировка таблицы
+        function sortTable(columnIndex) {
+            const table = document.querySelector('tbody');
+            const rows = Array.from(table.rows);
+
+            rows.sort((a, b) => {
+                const textA = a.cells[columnIndex].textContent;
+                const textB = b.cells[columnIndex].textContent;
+
+                return columnIndex === 2 // Числовое поле
+                    ? parseFloat(textA) - parseFloat(textB)
+                    : textA.localeCompare(textB);
+            });
+
+            rows.forEach(row => table.appendChild(row));
+        }
+    </script>
+</body>
+</html>
